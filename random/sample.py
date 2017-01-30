@@ -12,7 +12,7 @@ def get_args():
     parser.add_argument('-o', '--out_dir', metavar='DIR',
             type=str, help='Output directory', default="")
     parser.add_argument('-p', '--pct', metavar='PERCENT', 
-            type=float, default=.2)
+            type=int, default=20)
     parser.add_argument('-n', '--num', metavar='NUMBER', type=int, default=0)
     return parser.parse_args()
 
@@ -45,44 +45,41 @@ def main():
         count += 1
 
     #
-    # Either take a static number of records or a percentage
+    # Use a probabalistic method to get "num"
     #
-    if (num == 0) and (not 0 < pct < 1):
-        print("--pct ({}) must be b/w 0 and 1".format(pct))
-        exit(1)
+    if num > 0:
+        if num > count:
+            print("Cannot take {} from {} sequences".format(num, count))
+            exit(1)
 
-    num_take = num if num > 0 else round(count * pct)
-    if num_take > count:
-        print("Can't take '{}' from '{}' sequences".format(num_take, count))
-        exit(1)
+        pct = rount(num / count, 2)
 
-    #
-    # Take a random sample and sort the output
-    #
-    n = sorted(random.sample(range(count), num_take))
+    if not 0 < pct < 100:
+        print("--pct ({}) must be b/w 0 and 100".format(pct))
+        exit(1)
 
     #
     # E.g., input "/foo/test.fa" output "/foo/test.sub.fa"
     #
     base, ext = os.path.splitext(os.path.basename(fasta))
     out_file  = os.path.join(out_dir, base + '.sub' + ext)
+    max       = round(count * pct / 100)
 
     #
     # When the record number equals the next number in the sample,
     # print it to the output file.
     #
     with open(out_file, 'wt') as fh:
-        take = n.pop(0)
+        took = 0
         for pos, record in enumerate(SeqIO.parse(fasta, "fasta")):
-            if pos == take:
+            if random.randint(0,100) < pct:
+                took += 1
                 SeqIO.write(record, fh, "fasta")
-                if len(n) > 0:
-                    take = n.pop(0)
-                else:
+                if took == max:
                     break
 
-    print('Done, put {} sequence{} into "{}"'.format(
-        num_take, '' if num_take == 1 else 's', out_file))
+    print('Done, took {} sequence{} into "{}"'.format(
+        took, '' if took == 1 else 's', out_file))
 
 if __name__ == '__main__':
     main()
