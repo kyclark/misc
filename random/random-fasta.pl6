@@ -2,42 +2,58 @@
 
 use Bio::SeqIO;
 
+subset File of Str where *.IO.f;
+
 sub MAIN (
-	Str :$fasta! where *.IO.f, 
-	Rat :$percent! where 0 < * < 1,
+    File :$fasta!, 
+    Str  :$out-dir=$*CWD.Str, 
+    Int  :$percent is copy = 20,  
+    Int  :$num=0
 ) {
-	my $count = $fasta.IO.lines.grep(/^'>'/).elems;
-	if $count == 0 {
-		note "Found no sequences in $fasta";
-		exit(1);
-	}
+    unless $num > 0 || $percent > 0 {
+        note("Must provide either --num or --percent");
+        exit(1)
+    }
 
-	my $out-file = open $fasta ~ '.sub', :w;
-	my @take     = (0..$count).BagHash.grab(round($count * $percent)).sort;
-	my $seq-in   = Bio::SeqIO.new(format => 'fasta', file => $fasta);
-	my $next     = @take.shift;
-	my $i        = 0;
+    mkdir($out-dir) unless $out-dir.IO.d;
 
-	while (my $seq = $seq-in.next-Seq) {
-		$i++;
-		#say $seq;
-		#put "$i: Will take $next";
-		if $i == $next {
-			$out-file.print(sprintf(">%s\n%s\n", $i, $seq.seq));
-			#say $seq;
-			if @take {
-				$next = @take.shift;
-			}	
-			else {
-				last;
-			}
-		}
-	}
+    my $count = $fasta.IO.lines.grep(/^'>'/).elems;
+    if $count == 0 {
+        note "Found no sequences in $fasta";
+        exit(1);
+    }
+
+    if $num > 0 {
+        $percent = (round($num/$count, .01) * 100).Int;
+    }
+
+    unless 0 < $percent < 100 {
+        note("--percent ($percent) must be between 0 and 100");
+        exit(1)
+    }
+
+    my $out-file = $*SPEC.catfile($out-dir, $fasta ~ '.sub');
+    my $out-fh   = open $out-file, :w;
+    my $seq-in   = Bio::SeqIO.new(format => 'fasta', file => $fasta);
+    my $max      = round($count * $percent / 100);
+    my $took     = 0;
+
+    while (my $seq = $seq-in.next-Seq) {
+        if (1..100).pick <= $percent {
+            $took++;
+            $out-fh.print(sprintf(">%s\n%s\n", $took, $seq.seq));
+            if $took == $max {
+                last;
+            }
+        }
+    }
+
+    printf("Took %s into %s\n", $took, $out-file);
 }
 
 sub USAGE {
     printf 
-  	  "Usage:\n  %s --fasta=<File> --percent=<Double>\n" ~
-	  "Percent must be between 0 and 1\n",
-	  $*PROGRAM-NAME;
+        "Usage:\n  %s --fasta=<File> --percent=<Double>\n" ~
+      "Percent must be between 0 and 100\n",
+      $*PROGRAM-NAME;
 }
