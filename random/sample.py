@@ -72,7 +72,7 @@ def main():
     with open(out_file, 'wt') as fh:
         took = 0
         for pos, record in enumerate(SeqIO.parse(fasta, "fasta")):
-            if random.randint(0,100) < pct:
+            if random.randint(0,100) <= pct:
                 took += 1
                 SeqIO.write(record, fh, "fasta")
                 if took == max:
